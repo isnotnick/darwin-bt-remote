@@ -28,5 +28,8 @@ enum GATT {
     nonisolated(unsafe) static let modelNumber = CBUUID(string: "00002A24-0000-1000-8000-00805F9B34FB")
     nonisolated(unsafe) static let pnpID = CBUUID(string: "00002A50-0000-1000-8000-00805F9B34FB")
 
+    /// CoreBluetooth's advertisement key for the GAP Appearance AD type (0x19)
+    static let advertisementDataAppearanceKey = "kCBAdvDataAppearance"
+
     static let externalReportReferenceValue = Data([0x19, 0x2A])
 }
