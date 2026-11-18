@@ -35,6 +35,9 @@ public final class HIDPeripheral: NSObject, ObservableObject {
     private var hidServiceObj: CBMutableService?
     private var isHIDServiceAllowed = false
     private var isReadyToSendNotification = true
+    /// undocumented key; dropped after a rejected start so advertising still works
+    private var isAdvertisingAppearance = false
+    private var isAppearanceRejected = false
 
     private var charsByReport: [HIDReport: CBMutableCharacteristic] = [:]
     private var bootMouseInputChar: CBMutableCharacteristic?
@@ -329,11 +332,20 @@ public final class HIDPeripheral: NSObject, ObservableObject {
 
     private func startAdvertisingNow() {
         guard let pManager, !isAdvertising else { return }
-        pManager.startAdvertising([
+        var data: [String: Any] = [
             CBAdvertisementDataLocalNameKey: localName,
             // hidService stays first
             CBAdvertisementDataServiceUUIDsKey: [GATT.hidServiceAdvertised]
-        ])
+        ]
+        // Android TV pairing lists only LE devices whose Appearance maps to a keyboard/pointer class
+        if let appearance = identity.appearance, !isAppearanceRejected {
+            data[GATT.advertisementDataAppearanceKey] = NSNumber(value: appearance)
+            isAdvertisingAppearance = true
+        } else {
+            isAdvertisingAppearance = false
+        }
+        _trace("startAdvertising: \(data.keys.sorted())")
+        pManager.startAdvertising(data)
     }
 
     private func broadcast(_ data: Data, reportID: UInt8) {
@@ -446,8 +458,14 @@ extension HIDPeripheral: @preconcurrency CBPeripheralManagerDelegate {
     public func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         if let error {
             isAdvertising = false
-            lastError = error.localizedDescription
             log.error("startAdvertising error: \(error.localizedDescription, privacy: .public)")
+            if isAdvertisingAppearance, !isAppearanceRejected {
+                isAppearanceRejected = true
+                _trace("retrying advertising without appearance")
+                startAdvertisingNow()
+                return
+            }
+            lastError = error.localizedDescription
         } else {
             isAdvertising = true
             _trace("advertising as \(localName)")

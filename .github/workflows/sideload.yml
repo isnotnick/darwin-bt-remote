@@ -1,0 +1,67 @@
+name: Sideload Build
+
+# Unsigned test builds: re-sign the IPA with AltStore/Sideloadly, or run the ad-hoc signed Mac app locally.
+on:
+  push:
+    branches:
+      - "claude/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    # arm64 macOS runners are often capacity-starved; build on Intel too and use whichever finishes
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap
+        env:
+          CI_PRIMARY_REPOSITORY_PATH: ${{ github.workspace }}
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          ci_scripts/ci_post_clone.sh
+
+      - name: Build iOS (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BTRemote.xcodeproj \
+            -scheme BTRemote \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath .build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          rm -rf .build/Payload
+          mkdir -p .build/Payload out
+          cp -R .build/DerivedData/Build/Products/Release-iphoneos/BTRemote.app .build/Payload/
+          (cd .build && /usr/bin/zip -qry ../out/BTRemote-unsigned.ipa Payload)
+
+      - name: Build macOS (ad-hoc)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BTRemote.xcodeproj \
+            -scheme BTRemote \
+            -configuration Release \
+            -destination "platform=macOS" \
+            -derivedDataPath .build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          APP=.build/DerivedData/Build/Products/Release/BTRemote.app
+          codesign --force --deep --sign - --entitlements BTRemote/entitlements.plist "$APP"
+          ditto -c -k --keepParent "$APP" out/BTRemote-macOS-adhoc.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: sideload-${{ matrix.runner }}
+          path: out/*

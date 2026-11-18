@@ -36,6 +36,8 @@ public struct HIDIdentity {
     public let batteryReportID: UInt8?
     public let boot: BootReports?
     public let classOfDevice: UInt32
+    /// GAP appearance advertised over LE; Android derives class of device from it
+    public let appearance: UInt16?
     /// add HID SDP
     public let sdp: [String: Any]
     /// add PnP SDP
@@ -54,6 +56,7 @@ public struct HIDIdentity {
         batteryReportID: UInt8? = nil,
         boot: BootReports? = nil,
         classOfDevice: UInt32,
+        appearance: UInt16? = nil,
         sdp: [String: Any],
         classicDeviceID: Bool = false
     ) {
@@ -69,6 +72,7 @@ public struct HIDIdentity {
         self.batteryReportID = batteryReportID
         self.boot = boot
         self.classOfDevice = classOfDevice
+        self.appearance = appearance
         self.sdp = sdp
         self.classicDeviceID = classicDeviceID
     }

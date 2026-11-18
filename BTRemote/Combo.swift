@@ -45,6 +45,8 @@ final class Combo: ObservableObject, HIDProfile {
             keyboardLEDs: ReportID.keyboardLEDs.rawValue
         ),
         classOfDevice: 0x2540,
+        // HID Keyboard: Android maps it to CoD 0x0540, which Android TV pairing requires
+        appearance: 0x03C1,
         sdp: Combo.sdp
     )
 
